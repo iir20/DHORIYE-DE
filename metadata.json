@@ -1,0 +1,5 @@
+{
+  "name": "ধরিয়ে দে (Dhoriye De)",
+  "description": "An anonymous anti-corruption reporting platform for Bangladesh. Report corruption, upload evidence, and visualize hotspots on an interactive map.",
+  "requestFramePermissions": ["geolocation"]
+}
