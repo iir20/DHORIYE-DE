@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Map as MapIcon, List, Plus, Languages, Search, AlertTriangle, Filter, ArrowUpDown, Share2 } from 'lucide-react';
+import { Shield, Plus, Search, AlertTriangle, ArrowUpDown, Share2 } from 'lucide-react';
 import { getSupabase } from './lib/supabase';
 import { translations, Language } from './lib/i18n';
 import { Report } from './types';
@@ -11,6 +11,8 @@ import ReportDetail from './components/ReportDetail';
 import LandingPage from './components/LandingPage';
 import LoadingScreen from './components/LoadingScreen';
 import ShareModal from './components/ShareModal';
+import Navbar from './components/Navbar';
+import SkeletonCard from './components/SkeletonCard';
 import { cn } from './lib/utils';
 
 type AppState = 'landing' | 'loading' | 'platform';
@@ -25,10 +27,21 @@ export default function App() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'upvotes' | 'downvotes'>('newest');
 
   const supabase = getSupabase();
   const t = translations[lang];
+
+  useEffect(() => {
+    if (search === debouncedSearch) return;
+    setLoading(true);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const fetchReports = async () => {
     if (!supabase) {
@@ -87,10 +100,16 @@ export default function App() {
     }, 2500);
   };
 
+  const handleSortChange = (newSort: any) => {
+    setLoading(true);
+    setSortBy(newSort);
+    setTimeout(() => setLoading(false), 400);
+  };
+
   const filteredReports = reports
     .filter(r => 
-      r.description.toLowerCase().includes(search.toLowerCase()) ||
-      r.category.toLowerCase().includes(search.toLowerCase())
+      r.description.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      r.category.toLowerCase().includes(debouncedSearch.toLowerCase())
     )
     .sort((a, b) => {
       if (sortBy === 'upvotes') return (b.upvotes || 0) - (a.upvotes || 0);
@@ -107,31 +126,14 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-brand-black text-white py-4 shadow-xl">
-        <div className="container mx-auto px-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand-red rounded-xl shadow-lg shadow-red-900/20">
-              <Shield className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black tracking-tighter leading-none">{t.title}</h1>
-              <p className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">{t.subtitle}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setLang(lang === 'bn' ? 'en' : 'bn')}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800 hover:bg-zinc-700 transition-colors text-xs font-bold"
-            >
-              <Languages size={14} />
-              {lang === 'bn' ? 'English' : 'বাংলা'}
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen flex flex-col bg-zinc-50">
+      <Navbar 
+        lang={lang} 
+        onToggleLang={() => setLang(lang === 'bn' ? 'en' : 'bn')}
+        currentView={view}
+        onViewChange={setView}
+        onHomeClick={() => setAppState('landing')}
+      />
 
       {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-8">
@@ -157,7 +159,7 @@ export default function App() {
                   <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={14} />
                   <select 
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
+                    onChange={(e) => handleSortChange(e.target.value as any)}
                     className="w-full pl-10 pr-4 py-2 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-brand-red outline-none text-xs font-bold appearance-none"
                   >
                     <option value="newest">{t.newest}</option>
@@ -165,29 +167,6 @@ export default function App() {
                     <option value="downvotes">{t.mostDownvoted}</option>
                   </select>
                 </div>
-              </div>
-
-              <div className="flex p-1 bg-zinc-100 rounded-xl">
-                <button 
-                  onClick={() => setView('feed')}
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all",
-                    view === 'feed' ? "bg-white shadow-sm text-brand-red" : "text-zinc-500 hover:text-zinc-700"
-                  )}
-                >
-                  <List size={16} />
-                  {t.liveFeed}
-                </button>
-                <button 
-                  onClick={() => setView('map')}
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all",
-                    view === 'map' ? "bg-white shadow-sm text-brand-red" : "text-zinc-500 hover:text-zinc-700"
-                  )}
-                >
-                  <MapIcon size={16} />
-                  {t.mapView}
-                </button>
               </div>
 
               <button 
@@ -266,7 +245,7 @@ export default function App() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {loading ? (
                         Array.from({ length: 4 }).map((_, i) => (
-                          <div key={i} className="h-64 bg-zinc-100 animate-pulse rounded-2xl" />
+                          <SkeletonCard key={i} />
                         ))
                       ) : filteredReports.length > 0 ? (
                         filteredReports.map((report: Report) => {
